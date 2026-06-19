@@ -63,12 +63,6 @@ on:
         type: boolean
         default: false
 
-      low_power:
-        description: "Disable debug instrumentation to save power"
-        required: true
-        type: boolean
-        default: false
-
 
 jobs:
   Kernel_CI:
@@ -151,9 +145,6 @@ jobs:
           if [[ "${{ inputs.rekernel }}" == true ]]; then
             KERNEL_NAME="${KERNEL_NAME}-rekernel"
           fi
-          if [[ "${{ inputs.low_power }}" == true ]]; then
-            KERNEL_NAME="${KERNEL_NAME}-lowpower"
-          fi
 
           echo "KERNEL_NAME=${KERNEL_NAME}" >> $GITHUB_ENV
 
@@ -224,14 +215,6 @@ jobs:
             echo "CONFIG_REKERNEL_NETWORK=n" >> arch/arm64/configs/gki_defconfig
           fi
 
-          if [[ "${{ inputs.low_power }}" == true ]]; then
-            echo "# CONFIG_TRACE_MMIO_ACCESS is not set" >> arch/arm64/configs/gki_defconfig
-            echo "# CONFIG_KASAN is not set"             >> arch/arm64/configs/gki_defconfig
-            echo "# CONFIG_UBSAN is not set"             >> arch/arm64/configs/gki_defconfig
-            echo "# CONFIG_SCHEDSTATS is not set"        >> arch/arm64/configs/gki_defconfig
-            echo "# CONFIG_PROFILING is not set"         >> arch/arm64/configs/gki_defconfig
-          fi
-
           echo "-${KERNEL_NAME}-${{ github.actor }}" > .scmversion
           
           echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
@@ -299,12 +282,6 @@ jobs:
             rekernel_checkbox="Unsupported"
           fi
 
-          if [[ "${{ inputs.low_power }}" == true ]]; then
-            lowpower_checkbox="Enabled"
-          else
-            lowpower_checkbox="Disabled"
-          fi
-
 
           gh release create "$REL_NAME" --title "$REL_NAME" --notes "# Unofficial kernel for Xiaomi 12(cupid)
           | feature       | value                       |
@@ -318,5 +295,4 @@ jobs:
           | KPM           | ${kpm_checkbox}             |
           | BBG patch     | ${bbg_checkbox}             |
           | Re-Kernel     | ${rekernel_checkbox}        |
-          | Low power     | ${lowpower_checkbox}        |
           " "${ZIP_FILE}" Image
