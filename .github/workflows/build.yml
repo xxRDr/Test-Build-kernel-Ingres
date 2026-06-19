@@ -52,12 +52,24 @@ on:
         type: boolean
         default: false
 
-      BBG: 
+      BBG:
         description: "Add BBG support"
         required: true
         type: boolean
 
-          
+      rekernel:
+        description: "Add Re-Kernel support"
+        required: true
+        type: boolean
+        default: false
+
+      low_power:
+        description: "Disable debug instrumentation to save power"
+        required: true
+        type: boolean
+        default: false
+
+
 jobs:
   Kernel_CI:
     env:
@@ -136,6 +148,12 @@ jobs:
           if [[ "${{ inputs.BBG }}" == true ]]; then
             KERNEL_NAME="${KERNEL_NAME}-BBG"
           fi
+          if [[ "${{ inputs.rekernel }}" == true ]]; then
+            KERNEL_NAME="${KERNEL_NAME}-rekernel"
+          fi
+          if [[ "${{ inputs.low_power }}" == true ]]; then
+            KERNEL_NAME="${KERNEL_NAME}-lowpower"
+          fi
 
           echo "KERNEL_NAME=${KERNEL_NAME}" >> $GITHUB_ENV
 
@@ -199,7 +217,22 @@ jobs:
             sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
           fi
 
-          echo "-${KERNEL_NAME}-${{ github.actor }}" > .scmversion 
+          if [[ "${{ inputs.rekernel }}" == true ]]; then
+            git clone --depth=1 https://github.com/Sakion-Team/Re-Kernel.git rekernel-src
+            bash rekernel-src/Integrate/patches.sh
+            echo "CONFIG_REKERNEL=y" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_REKERNEL_NETWORK=n" >> arch/arm64/configs/gki_defconfig
+          fi
+
+          if [[ "${{ inputs.low_power }}" == true ]]; then
+            echo "# CONFIG_TRACE_MMIO_ACCESS is not set" >> arch/arm64/configs/gki_defconfig
+            echo "# CONFIG_KASAN is not set"             >> arch/arm64/configs/gki_defconfig
+            echo "# CONFIG_UBSAN is not set"             >> arch/arm64/configs/gki_defconfig
+            echo "# CONFIG_SCHEDSTATS is not set"        >> arch/arm64/configs/gki_defconfig
+            echo "# CONFIG_PROFILING is not set"         >> arch/arm64/configs/gki_defconfig
+          fi
+
+          echo "-${KERNEL_NAME}-${{ github.actor }}" > .scmversion
           
           echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
           
@@ -260,7 +293,19 @@ jobs:
             bbg_checkbox="Unsupported"
           fi
 
-                    
+          if [[ "${{ inputs.rekernel }}" == true ]]; then
+            rekernel_checkbox="Supported"
+          else
+            rekernel_checkbox="Unsupported"
+          fi
+
+          if [[ "${{ inputs.low_power }}" == true ]]; then
+            lowpower_checkbox="Enabled"
+          else
+            lowpower_checkbox="Disabled"
+          fi
+
+
           gh release create "$REL_NAME" --title "$REL_NAME" --notes "# Unofficial kernel for Xiaomi 12(cupid)
           | feature       | value                       |
           | ------------- | --------------------------- |
@@ -272,4 +317,6 @@ jobs:
           | SUSFS         | ${susfs_checkbox}           |
           | KPM           | ${kpm_checkbox}             |
           | BBG patch     | ${bbg_checkbox}             |
+          | Re-Kernel     | ${rekernel_checkbox}        |
+          | Low power     | ${lowpower_checkbox}        |
           " "${ZIP_FILE}" Image
