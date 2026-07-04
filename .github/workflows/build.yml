@@ -76,7 +76,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         SOC: sm8450
         CCACHE_KEY: ccache-ecsv3-cupid-sm8450
-        # Public invite link of your Telegram group (shown as "JOIN" button in the push).
+        # Public link of your Telegram group (shown as "JOIN" button in the push).
         TG_GROUP_URL: "https://t.me/huangdihdskernelbuilds"
     runs-on: ubuntu-latest
     permissions:
@@ -399,18 +399,28 @@ jobs:
           👉 <a href=\"${REL_URL}\"><b>📥 GET YOUR KERNEL HERE</b></a>
           📢 <a href=\"${TG_GROUP_URL}\"><b>JOIN TELEGRAM GROUP</b></a>"
 
-          IFS=' ,' read -r -a CHAT_IDS <<< "$TG_CHAT_ID"
-          for ID in "${CHAT_IDS[@]}"; do
-            [ -z "$ID" ] && continue
-            PAYLOAD=$(jq -n --arg chat_id "$ID" --arg text "$MSG_TEXT" \
-              '{chat_id:$chat_id, parse_mode:"HTML", disable_web_page_preview:true, text:$text}')
-            echo "Sending to Telegram chat $ID ..."
+          # Each entry in TG_CHAT_ID is "chat_id" or "chat_id:topic_id".
+          # e.g. "@huangdihdskernelbuilds:27, @otherGroup:5, @someChannel"
+          IFS=' ,' read -r -a ENTRIES <<< "$TG_CHAT_ID"
+          for entry in "${ENTRIES[@]}"; do
+            [ -z "$entry" ] && continue
+            if [[ "$entry" == *:* ]]; then
+              ID="${entry%%:*}"
+              THREAD="${entry##*:}"
+            else
+              ID="$entry"
+              THREAD=""
+            fi
+            PAYLOAD=$(jq -n --arg chat_id "$ID" --arg text "$MSG_TEXT" --arg thread "$THREAD" \
+              '{chat_id:$chat_id, parse_mode:"HTML", disable_web_page_preview:true, text:$text}
+               + (if $thread != "" then {message_thread_id: ($thread|tonumber)} else {} end)')
+            echo "Sending to chat $ID${THREAD:+ (topic $THREAD)} ..."
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
               -H "Content-Type: application/json" -d "$PAYLOAD")
             HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
             BODY=$(echo "$RESPONSE" | head -n -1)
             if [ "$HTTP_CODE" -eq 200 ]; then
-              echo "Sent to $ID"
+              echo "Sent to $ID${THREAD:+ topic $THREAD}"
             else
               echo "::warning::Telegram push failed for $ID (HTTP $HTTP_CODE): $BODY"
             fi
