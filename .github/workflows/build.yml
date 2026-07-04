@@ -117,9 +117,23 @@ jobs:
         run: |
           mkdir -p toolchains/${{ inputs.clang_version }}
           cd toolchains
-
-          curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/${{ inputs.clang_version }}.tar.gz
-          tar -xf "${{ inputs.clang_version }}.tar.gz" -C ${{ inputs.clang_version }}
+          URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/${{ inputs.clang_version }}.tar.gz"
+          for i in 1 2 3 4 5; do
+            echo "Downloading clang (attempt $i)..."
+            curl -L --fail --retry 3 -o "${{ inputs.clang_version }}.tar.gz" "$URL" || true
+            # googlesource's on-the-fly archive endpoint occasionally returns a tiny
+            # HTML error page instead of the tarball; validate it's really gzip first
+            if gzip -t "${{ inputs.clang_version }}.tar.gz" 2>/dev/null; then
+              echo "Valid gzip, extracting..."
+              tar -xf "${{ inputs.clang_version }}.tar.gz" -C ${{ inputs.clang_version }}
+              break
+            fi
+            echo "Bad/empty download (googlesource hiccup), head of file:"
+            head -c 200 "${{ inputs.clang_version }}.tar.gz"; echo
+            if [ "$i" = "5" ]; then echo "clang download failed after 5 retries"; exit 1; fi
+            echo "retrying in 15s..."
+            sleep 15
+          done
 
       # ---- ccache-ECS (cctv18 style layered ccache) ----
       - name: Configure ccache dir and key
