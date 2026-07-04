@@ -76,8 +76,8 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         SOC: sm8450
         CCACHE_KEY: ccache-ecsv3-cupid-sm8450
-        # Public invite link of your Telegram group (shown as "JOIN" button in the push). Replace with your new group's link.
-        TG_GROUP_URL: "https://t.me/REPLACE_WITH_YOUR_GROUP"
+        # Public invite link of your Telegram group (shown as "JOIN" button in the push).
+        TG_GROUP_URL: "https://t.me/huangdihdskernelbuilds"
     runs-on: ubuntu-latest
     permissions:
       contents: write
