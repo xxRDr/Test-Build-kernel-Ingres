@@ -14,7 +14,7 @@ on:
           - clang-r563880c
           - clang-r574158
           - clang-stable
-          
+
       kernel_source:
         description: Kernel Source Code
         required: true
@@ -28,7 +28,7 @@ on:
         required: true
         type: string
         default: "lineage-23.2"
-        
+
       ksu_type:
         description: "KernelSU Version"
         required: true
@@ -46,12 +46,6 @@ on:
         type: boolean
         default: false
 
-      kpm_support:
-        description: "Add KPM support"
-        required: true
-        type: boolean
-        default: false
-
       BBG:
         description: "Add BBG support"
         required: true
@@ -63,25 +57,38 @@ on:
         type: boolean
         default: false
 
+      droidspaces:
+        description: "Add DroidSpaces support"
+        required: true
+        type: boolean
+        default: false
+
+      ccache_update:
+        description: "Refresh ccache (overwrite the repo cache with this build's ccache; enable when u changed configs/source or need a clean cache)"
+        required: true
+        type: boolean
+        default: false
+
 
 jobs:
   Kernel_CI:
     env:
         GH_TOKEN: ${{ github.token }}
         SOC: sm8450
+        CCACHE_KEY: ccache-ecsv3-cupid-sm8450
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: read
+      actions: write
       checks: read
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup SWAP
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 16
-          
+
       - name: Install build dependencies
         run: |
           sudo apt update
@@ -97,8 +104,10 @@ jobs:
           curl \
           dwarves \
           cpio \
+          ccache \
+          zstd \
           gcc-aarch64-linux-gnu
-          
+
       - name: Clone Kernel Source
         run: |
           git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/${{ inputs.kernel_source }}/android_kernel_xiaomi_${SOC}.git ${SOC}
@@ -111,6 +120,35 @@ jobs:
 
           curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/${{ inputs.clang_version }}.tar.gz
           tar -xf "${{ inputs.clang_version }}.tar.gz" -C ${{ inputs.clang_version }}
+
+      # ---- ccache-ECS (cctv18 style layered ccache) ----
+      - name: Configure ccache dir and key
+        run: |
+          echo "CCACHE_DIR=$HOME/.ccache_cupid" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
+          if [[ "${{ inputs.droidspaces }}" == true ]]; then
+            CCACHE_REAL_KEY=${CCACHE_KEY}-Droidspaces
+          else
+            CCACHE_REAL_KEY=${CCACHE_KEY}-none
+          fi
+          echo "CCACHE_REAL_KEY=$CCACHE_REAL_KEY" >> $GITHUB_ENV
+
+      - name: Purge old ccache (on refresh)
+        if: ${{ inputs.ccache_update }}
+        continue-on-error: true
+        run: |
+          echo "Deleting old repo ccache to force a fresh save..."
+          gh cache delete "${CCACHE_REAL_KEY}-${{ runner.os }}-${{ inputs.kernel_branch }}" -R ${{ github.repository }} || echo "No old ccache to delete"
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        id: ccache-restore
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ inputs.kernel_branch }}
+          restore-keys: |
+            ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-
+            ${{ env.CCACHE_REAL_KEY }}-
 
       - name: Compile Kernel
         run: |
@@ -131,13 +169,22 @@ jobs:
           export OBJDUMP="${CLANG_ROOT}/llvm-objdump"
           export STRIP="${CLANG_ROOT}/llvm-strip"
 
+          # ccache-ECS tuning: normalize paths/timestamps so cache hits across runs
+          export CCACHE_COMPILERCHECK="none"
+          export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
+          export CCACHE_NOHASHDIR="true"
+          export CCACHE_NOHARDLINK="true"
+          mkdir -p "${CCACHE_DIR}"
+          echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "${CCACHE_DIR}/ccache.conf"
+          ccache -M "${CCACHE_MAXSIZE}"
+          ccache -o compression=true
+          echo "ccache status before build:"
+          ccache -s
+
           KERNEL_NAME="${{ inputs.ksu_type }}"
 
           if [[ "${{ inputs.susfs }}" == true ]]; then
             KERNEL_NAME="${KERNEL_NAME}-susfs"
-          fi
-          if [[ "${{ inputs.kpm_support }}" == true ]]; then
-            KERNEL_NAME="${KERNEL_NAME}-kpm"
           fi
           if [[ "${{ inputs.BBG }}" == true ]]; then
             KERNEL_NAME="${KERNEL_NAME}-BBG"
@@ -145,20 +192,23 @@ jobs:
           if [[ "${{ inputs.rekernel }}" == true ]]; then
             KERNEL_NAME="${KERNEL_NAME}-rekernel"
           fi
+          if [[ "${{ inputs.droidspaces }}" == true ]]; then
+            KERNEL_NAME="${KERNEL_NAME}-droidspaces"
+          fi
 
           echo "KERNEL_NAME=${KERNEL_NAME}" >> $GITHUB_ENV
 
           cd ${SOC}
 
           case "${{ inputs.ksu_type }}" in
-          
+
             "None")
               ;;
-              
+
             "Official-KernelSU")
               curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
               ;;
-              
+
             "KowSU")
                curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/main/kernel/setup.sh" | bash -s master
               ;;
@@ -175,7 +225,7 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
               ;;
           esac
-          
+
           if [[ "${{ inputs.susfs }}" == true ]]; then
             git clone -b gki-android12-5.10 https://gitlab.com/simonpunk/susfs4ksu.git susfs
             cd susfs
@@ -195,13 +245,6 @@ jobs:
             echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> arch/arm64/configs/gki_defconfig
           fi
 
-          if [[ "${{ inputs.kpm_support }}" == true ]]; then
-            echo "CONFIG_KPM=y" >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/gki_defconfig
-            echo "CONFIG_KPROBES=y" >> arch/arm64/configs/gki_defconfig
-          fi
-
           if [[ "${{ inputs.BBG }}" == true ]]; then
             wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
             echo "CONFIG_BBG=y" >> arch/arm64/configs/gki_defconfig
@@ -215,30 +258,37 @@ jobs:
             echo "CONFIG_REKERNEL_NETWORK=n" >> arch/arm64/configs/gki_defconfig
           fi
 
+          DROIDSPACES_CONFIG=""
+          if [[ "${{ inputs.droidspaces }}" == true ]]; then
+            # cupid (sm8450) ships GKI kernel 5.10 -> DroidSpaces 5.10 patch path
+            curl -Lo patch-for-below-6.12.patch https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/refs/heads/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_6_7_8.patch
+            patch -p1 < patch-for-below-6.12.patch
+
+            curl -Lo patch-for-5.10-or-lower.patch https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/refs/heads/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/002.5.10_or_lower_use_android_abi_padding_for_posix_mqueue.patch
+            patch -p1 < patch-for-5.10-or-lower.patch
+
+            cp ${GITHUB_WORKSPACE}/configs/droidspaces-gki.config arch/arm64/configs/vendor/droidspaces.config
+            DROIDSPACES_CONFIG="vendor/droidspaces.config"
+          fi
+
           echo "-${KERNEL_NAME}-${{ github.actor }}" > .scmversion
-          
+
           echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
-          
-          make O=out gki_defconfig vendor/waipio_GKI.config vendor/xiaomi_GKI.config vendor/cupid_GKI.config vendor/debugfs.config
 
-          make -j2 O=out Image
+          make O=out gki_defconfig vendor/waipio_GKI.config vendor/xiaomi_GKI.config vendor/cupid_GKI.config vendor/debugfs.config ${DROIDSPACES_CONFIG}
 
-          cd out/arch/arm64/boot/
-          
-          if [[ "${{ inputs.kpm_support }}" == true ]]; then
-            echo "Downloading SukiSU_KernelPatch..."
-            curl -s https://api.github.com/repos/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/latest \
-              | grep "browser_download_url" \
-              | grep "patch_linux" \
-              | cut -d '"' -f 4 \
-              | wget -qi -
-            echo "Patching kernel to add KPM support..."
-            chmod +x ./patch_linux
-            ./patch_linux
-            rm ./Image
-            mv ./oImage ./Image
-          fi 
+          # ccache must be injected via make command-line CC (LLVM=1 overrides the env CC otherwise)
+          make -j2 O=out CC="ccache ${CLANG_ROOT}/clang" HOSTCC="ccache ${CLANG_ROOT}/clang" Image
 
+          echo "ccache status after build:"
+          ccache -s
+
+      - name: Save ccache
+        if: ${{ always() && steps.ccache-restore.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ inputs.kernel_branch }}
 
       - name: Make AnyKernel3
         run: |
@@ -264,12 +314,6 @@ jobs:
             susfs_checkbox="Unsupported"
           fi
 
-          if [[ "${{ inputs.kpm_support }}" == true ]]; then
-            kpm_checkbox="Supported"
-          else
-            kpm_checkbox="Unsupported"
-          fi
-
           if [[ "${{ inputs.BBG }}" == true ]]; then
             bbg_checkbox="Supported"
           else
@@ -282,6 +326,12 @@ jobs:
             rekernel_checkbox="Unsupported"
           fi
 
+          if [[ "${{ inputs.droidspaces }}" == true ]]; then
+            droidspaces_checkbox="Supported"
+          else
+            droidspaces_checkbox="Unsupported"
+          fi
+
 
           gh release create "$REL_NAME" --title "$REL_NAME" --notes "# Unofficial kernel for Xiaomi 12(cupid)
           | feature       | value                       |
@@ -292,7 +342,7 @@ jobs:
           | Build time    | ${BUILD_TIME}               |
           | KSU type      | ${{ inputs.ksu_type }}      |
           | SUSFS         | ${susfs_checkbox}           |
-          | KPM           | ${kpm_checkbox}             |
           | BBG patch     | ${bbg_checkbox}             |
           | Re-Kernel     | ${rekernel_checkbox}        |
+          | DroidSpaces   | ${droidspaces_checkbox}     |
           " "${ZIP_FILE}" Image
