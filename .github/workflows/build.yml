@@ -1,4 +1,4 @@
-name: Compile Kernel
+name: Compile Kernel - POCO F4 GT (Ingres)
 
 on:
   workflow_dispatch:
@@ -15,19 +15,17 @@ on:
           - clang-r574158
           - clang-stable
 
-      kernel_source:
-        description: Kernel Source Code
-        required: true
-        type: choice
-        options:
-          - LineageOS
-          - crdroidandroid
-
       kernel_branch:
-        description: Kernel Branch(such as lineage-23.2 sixteen-qpr1)
+        description: "Branch for the Ingres-Centre kernel + LineageOS modules repos (both currently default to lineage-23.2)"
         required: true
         type: string
         default: "lineage-23.2"
+
+      devicetree_branch:
+        description: "Branch for the Ingres-Centre devicetrees repo (this repo currently defaults to lineage-23.0, NOT lineage-23.2 - double check before running)"
+        required: true
+        type: string
+        default: "lineage-23.0"
 
       ksu_type:
         description: "KernelSU Version"
@@ -75,7 +73,7 @@ jobs:
     env:
         GH_TOKEN: ${{ github.token }}
         SOC: sm8450
-        CCACHE_KEY: ccache-ecsv3-cupid-sm8450
+        CCACHE_KEY: ccache-ecsv3-ingres-sm8450
         # Public link of your Telegram group (shown as "JOIN" button in the push).
         TG_GROUP_URL: "https://t.me/huangdihdskernelbuilds"
     runs-on: ubuntu-latest
@@ -112,8 +110,17 @@ jobs:
 
       - name: Clone Kernel Source
         run: |
-          git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/${{ inputs.kernel_source }}/android_kernel_xiaomi_${SOC}.git ${SOC}
-          git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/${{ inputs.kernel_source }}/android_kernel_xiaomi_${SOC}-modules.git ${SOC}-modules
+          git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/Ingres-Centre/android_kernel_xiaomi_${SOC}.git ${SOC}
+          git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/LineageOS/android_kernel_xiaomi_${SOC}-modules.git ${SOC}-modules
+
+          # The Ingres-Centre devicetrees fork currently defaults to a different
+          # branch than the kernel/modules repos above (lineage-23.0 vs lineage-23.2),
+          # so try the requested branch first and fall back to the repo's own
+          # default branch if it isn't there. This mirrors the LineageOS kernel
+          # manifest path for this repo: arch/arm64/boot/dts/vendor.
+          rm -rf ${SOC}/arch/arm64/boot/dts/vendor
+          git clone --depth=1 -b ${{ inputs.devicetree_branch }} https://github.com/Ingres-Centre/android_kernel_xiaomi_${SOC}-devicetrees.git ${SOC}/arch/arm64/boot/dts/vendor \
+            || git clone --depth=1 https://github.com/Ingres-Centre/android_kernel_xiaomi_${SOC}-devicetrees.git ${SOC}/arch/arm64/boot/dts/vendor
 
       - name: Download AOSP Clang
         run: |
@@ -149,7 +156,7 @@ jobs:
       # ---- ccache-ECS (cctv18 style layered ccache) ----
       - name: Configure ccache dir and key
         run: |
-          echo "CCACHE_DIR=$HOME/.ccache_cupid" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache_ingres" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
           if [[ "${{ inputs.droidspaces }}" == true ]]; then
             CCACHE_REAL_KEY=${CCACHE_KEY}-Droidspaces
@@ -285,7 +292,7 @@ jobs:
 
           DROIDSPACES_CONFIG=""
           if [[ "${{ inputs.droidspaces }}" == true ]]; then
-            # cupid (sm8450) ships GKI kernel 5.10 -> DroidSpaces 5.10 patch path
+            # ingres (sm8450) ships GKI kernel 5.10 -> DroidSpaces 5.10 patch path
             curl -Lo patch-for-below-6.12.patch https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/refs/heads/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_6_7_8.patch
             patch -p1 < patch-for-below-6.12.patch
 
@@ -300,7 +307,7 @@ jobs:
 
           echo "CONFIG_TMPFS_XATTR=y" >> arch/arm64/configs/gki_defconfig
 
-          make O=out gki_defconfig vendor/waipio_GKI.config vendor/xiaomi_GKI.config vendor/cupid_GKI.config vendor/debugfs.config ${DROIDSPACES_CONFIG}
+          make O=out gki_defconfig vendor/waipio_GKI.config vendor/xiaomi_GKI.config vendor/ingres_GKI.config vendor/debugfs.config ${DROIDSPACES_CONFIG}
 
           # ccache must be injected via make command-line CC (LLVM=1 overrides the env CC otherwise)
           make -j2 O=out CC="ccache ${CLANG_ROOT}/clang" HOSTCC="ccache ${CLANG_ROOT}/clang" Image
@@ -329,7 +336,7 @@ jobs:
       - name: Create GitHub Release
         run: |
           BUILD_TIME=$(date -u +"%Y%m%d_%H%M")
-          REL_NAME="${SOC}_${{ inputs.kernel_source }}-${{ inputs.kernel_branch }}-${KERNEL_NAME}-${BUILD_TIME}"
+          REL_NAME="${SOC}_ingres-${{ inputs.kernel_branch }}-${KERNEL_NAME}-${BUILD_TIME}"
           echo "REL_NAME=${REL_NAME}" >> $GITHUB_ENV
           cd ${GITHUB_WORKSPACE}
           ZIP_FILE=$(ls *.zip)
@@ -359,18 +366,19 @@ jobs:
           fi
 
 
-          gh release create "$REL_NAME" --title "$REL_NAME" --notes "# Unofficial kernel for Xiaomi 12(cupid)
-          | feature       | value                       |
-          | ------------- | --------------------------- |
-          | Kernel source | ${{ inputs.kernel_source }} |
-          | Kernel branch | ${{ inputs.kernel_branch }} |
-          | Kernel name   | ${KERNEL_NAME}              |
-          | Build time    | ${BUILD_TIME}               |
-          | KSU type      | ${{ inputs.ksu_type }}      |
-          | SUSFS         | ${susfs_checkbox}           |
-          | BBG patch     | ${bbg_checkbox}             |
-          | Re-Kernel     | ${rekernel_checkbox}        |
-          | DroidSpaces   | ${droidspaces_checkbox}     |
+          gh release create "$REL_NAME" --title "$REL_NAME" --notes "# Unofficial kernel for POCO F4 GT (ingres)
+          | feature           | value                                       |
+          | ----------------- | -------------------------------------------- |
+          | Kernel source     | Ingres-Centre/android_kernel_xiaomi_sm8450   |
+          | Kernel branch     | ${{ inputs.kernel_branch }}                  |
+          | Devicetree branch | ${{ inputs.devicetree_branch }}              |
+          | Kernel name       | ${KERNEL_NAME}                               |
+          | Build time        | ${BUILD_TIME}                                |
+          | KSU type          | ${{ inputs.ksu_type }}                       |
+          | SUSFS             | ${susfs_checkbox}                            |
+          | BBG patch         | ${bbg_checkbox}                              |
+          | Re-Kernel         | ${rekernel_checkbox}                         |
+          | DroidSpaces       | ${droidspaces_checkbox}                      |
           " "${ZIP_FILE}" Image
 
       - name: Send Telegram Notification
@@ -395,10 +403,10 @@ jobs:
 
           REL_URL="${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.REL_NAME }}"
 
-          MSG_TEXT="🚀 <b>Xiaomi 12 (cupid) Kernel Build Successful!</b>
+          MSG_TEXT="🚀 <b>POCO F4 GT (ingres) Kernel Build Successful!</b>
           ━━━━━━━━━━━━━━━━━━
           <b>🏷️ Release Tag:</b> <code>${{ env.REL_NAME }}</code>
-          <b>🧬 Source:</b> ${{ inputs.kernel_source }} / ${{ inputs.kernel_branch }}
+          <b>🧬 Source:</b> Ingres-Centre / ${{ inputs.kernel_branch }} (DT: ${{ inputs.devicetree_branch }})
           <b>🔐 Root Solution:</b> ${{ inputs.ksu_type }}
           <b>🛡️ SUSFS:</b> ${SUSFS_L}
           <b>📡 Baseband-guard:</b> ${BBG_L}
