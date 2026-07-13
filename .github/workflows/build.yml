@@ -41,7 +41,7 @@ on:
       custom_name:
         description: "Nama kustom kernel (kosongkan buat pakai nama dari KSU type seperti biasa)"
         required: false
-        type: string
+        type: boolean
         default: "BEPADAAN"
 
       susfs:
