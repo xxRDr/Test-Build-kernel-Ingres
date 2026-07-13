@@ -218,15 +218,6 @@ jobs:
           if [[ "${{ inputs.susfs }}" == true ]]; then
             KERNEL_NAME="${KERNEL_NAME}-susfs"
           fi
-          if [[ "${{ inputs.BBG }}" == true ]]; then
-            KERNEL_NAME="${KERNEL_NAME}-BBG"
-          fi
-          if [[ "${{ inputs.rekernel }}" == true ]]; then
-            KERNEL_NAME="${KERNEL_NAME}-rekernel"
-          fi
-          if [[ "${{ inputs.droidspaces }}" == true ]]; then
-            KERNEL_NAME="${KERNEL_NAME}-droidspaces"
-          fi
 
           echo "KERNEL_NAME=${KERNEL_NAME}" >> $GITHUB_ENV
 
