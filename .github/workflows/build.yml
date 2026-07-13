@@ -39,7 +39,7 @@ on:
           - ReSukiSU
 
       custom_name:
-        description: "Nama kustom kernel (kosongkan buat pakai nama dari KSU type seperti biasa)"
+        description: "kernel"
         required: false
         type: choice
         default: BEPADAAN
