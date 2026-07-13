@@ -38,6 +38,12 @@ on:
           - KowSU
           - ReSukiSU
 
+      custom_name:
+        description: "Nama kustom kernel (kosongkan buat pakai nama dari KSU type seperti biasa)"
+        required: false
+        type: string
+        default: "BEPADAAN"
+
       susfs:
         description: "Add susfs support"
         required: true
@@ -213,7 +219,11 @@ jobs:
           echo "ccache status before build:"
           ccache -s
 
-          KERNEL_NAME="${{ inputs.ksu_type }}"
+          if [[ -n "${{ inputs.custom_name }}" ]]; then
+            KERNEL_NAME="${{ inputs.custom_name }}"
+          else
+            KERNEL_NAME="${{ inputs.ksu_type }}"
+          fi
 
           if [[ "${{ inputs.susfs }}" == true ]]; then
             KERNEL_NAME="${KERNEL_NAME}-susfs"
