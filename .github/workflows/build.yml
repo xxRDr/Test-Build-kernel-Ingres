@@ -25,7 +25,7 @@ on:
         description: "Branch for the Ingres-Centre devicetrees repo (this repo currently defaults to lineage-23.0, NOT lineage-23.2 - double check before running)"
         required: true
         type: string
-        default: "lineage-23.0"
+        default: "lineage-23.2"
 
       ksu_type:
         description: "KernelSU Version"
