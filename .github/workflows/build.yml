@@ -258,8 +258,15 @@ jobs:
           esac
 
           if [[ "${{ inputs.susfs }}" == true ]]; then
-            git clone -b gki-android12-5.10 https://gitlab.com/simonpunk/susfs4ksu.git susfs
+            # Cloning by branch name (no tag/commit pin) always checks out the
+            # branch tip, i.e. the latest commit, at the time the job runs.
+            # --depth=1 just makes that shallow/fast; we still capture the SHA
+            # so the exact SUSFS commit used is visible in logs/release notes.
+            git clone --depth=1 -b gki-android12-5.10 https://gitlab.com/simonpunk/susfs4ksu.git susfs
             cd susfs
+            SUSFS_COMMIT=$(git rev-parse --short HEAD)
+            echo "SUSFS_COMMIT=${SUSFS_COMMIT}" >> $GITHUB_ENV
+            echo "==> SUSFS: using latest commit ${SUSFS_COMMIT} on branch gki-android12-5.10"
             cp ./kernel_patches/50_add_susfs_in_gki-android12-5.10.patch ..
             cp ./kernel_patches/fs/* ../fs/
             cp ./kernel_patches/include/linux/* ../include/linux/
@@ -341,7 +348,7 @@ jobs:
           ZIP_FILE=$(ls *.zip)
 
           if [[ "${{ inputs.susfs }}" == true ]]; then
-            susfs_checkbox="Supported"
+            susfs_checkbox="Supported (susfs4ksu@${SUSFS_COMMIT})"
           else
             susfs_checkbox="Unsupported"
           fi
@@ -395,7 +402,11 @@ jobs:
           fi
 
           label() { if [ "$1" = "true" ]; then echo "Supported"; else echo "Unsupported"; fi; }
-          SUSFS_L=$(label "${{ inputs.susfs }}")
+          if [ "${{ inputs.susfs }}" = "true" ]; then
+            SUSFS_L="Supported (susfs4ksu@${SUSFS_COMMIT})"
+          else
+            SUSFS_L="Unsupported"
+          fi
           BBG_L=$(label "${{ inputs.BBG }}")
           REKERNEL_L=$(label "${{ inputs.rekernel }}")
           DROIDSPACES_L=$(label "${{ inputs.droidspaces }}")
@@ -438,3 +449,4 @@ jobs:
             echo "::warning::Telegram push failed for $ID (HTTP $HTTP_CODE): $BODY"
           fi
           echo "::endgroup::"
+          
