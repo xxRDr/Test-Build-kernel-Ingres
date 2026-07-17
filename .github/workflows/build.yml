@@ -227,10 +227,6 @@ jobs:
             KERNEL_NAME="${{ inputs.ksu_type }}"
           fi
 
-          if [[ "${{ inputs.susfs }}" == true ]]; then
-            KERNEL_NAME="${KERNEL_NAME}-susfs"
-          fi
-
           echo "KERNEL_NAME=${KERNEL_NAME}" >> $GITHUB_ENV
 
           cd ${SOC}
