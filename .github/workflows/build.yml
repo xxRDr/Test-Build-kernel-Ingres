@@ -26,7 +26,7 @@ on:
         description: "Branch on kernel_source above (independent from modules/devicetree branches below)"
         required: true
         type: string
-        default: "16-gki"
+        default: "lineage-23.2"
 
       modules_branch:
         description: "Branch for the LineageOS modules repo (unaffected by kernel_source/kernel_branch above - currently defaults to lineage-23.2)"
