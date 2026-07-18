@@ -16,8 +16,20 @@ on:
           - clang-r574158
           - clang-stable
 
+      kernel_source:
+        description: "Kernel source repo URL (msm-kernel). Paste any git URL here to override the default."
+        required: true
+        type: string
+        default: "https://github.com/aosp-pablo/android_kernel_xiaomi_sm8450"
+
       kernel_branch:
-        description: "Branch for the Ingres-Centre kernel + LineageOS modules repos (both currently default to lineage-23.2)"
+        description: "Branch on kernel_source above (independent from modules/devicetree branches below)"
+        required: true
+        type: string
+        default: "16-gki"
+
+      modules_branch:
+        description: "Branch for the LineageOS modules repo (unaffected by kernel_source/kernel_branch above - currently defaults to lineage-23.2)"
         required: true
         type: string
         default: "lineage-23.2"
@@ -119,8 +131,8 @@ jobs:
 
       - name: Clone Kernel Source
         run: |
-          git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/Ingres-Centre/android_kernel_xiaomi_${SOC}.git ${SOC}
-          git clone --depth=1 -b ${{ inputs.kernel_branch }} https://github.com/LineageOS/android_kernel_xiaomi_${SOC}-modules.git ${SOC}-modules
+          git clone --depth=1 -b ${{ inputs.kernel_branch }} ${{ inputs.kernel_source }} ${SOC}
+          git clone --depth=1 -b ${{ inputs.modules_branch }} https://github.com/LineageOS/android_kernel_xiaomi_${SOC}-modules.git ${SOC}-modules
 
           # The Ingres-Centre devicetrees fork currently defaults to a different
           # branch than the kernel/modules repos above (lineage-23.0 vs lineage-23.2),
@@ -376,8 +388,9 @@ jobs:
           gh release create "$REL_NAME" --title "$REL_NAME" --notes "# Unofficial kernel for POCO F4 GT (ingres)
           | feature           | value                                       |
           | ----------------- | -------------------------------------------- |
-          | Kernel source     | Ingres-Centre/android_kernel_xiaomi_sm8450   |
+          | Kernel source     | ${{ inputs.kernel_source }}                  |
           | Kernel branch     | ${{ inputs.kernel_branch }}                  |
+          | Modules branch    | ${{ inputs.modules_branch }}                 |
           | Devicetree branch | ${{ inputs.devicetree_branch }}              |
           | Kernel name       | ${KERNEL_NAME}                               |
           | Build time        | ${BUILD_TIME}                                |
@@ -417,7 +430,7 @@ jobs:
           MSG_TEXT="🚀 <b>POCO F4 GT (ingres) Kernel Build Successful!</b>
           ━━━━━━━━━━━━━━━━━━
           <b>🏷️ Release Tag:</b> <code>${{ env.REL_NAME }}</code>
-          <b>🧬 Source:</b> Ingres-Centre / ${{ inputs.kernel_branch }} (DT: ${{ inputs.devicetree_branch }})
+          <b>🧬 Source:</b> ${{ inputs.kernel_source }} @ ${{ inputs.kernel_branch }} (DT: ${{ inputs.devicetree_branch }})
           <b>🔐 Root Solution:</b> ${{ inputs.ksu_type }}
           <b>🛡️ SUSFS:</b> ${SUSFS_L}
           <b>📡 Baseband-guard:</b> ${BBG_L}
@@ -450,4 +463,5 @@ jobs:
             echo "::warning::Telegram push failed for $ID (HTTP $HTTP_CODE): $BODY"
           fi
           echo "::endgroup::"
+
           
