@@ -50,6 +50,7 @@ on:
           - KernelSU-Next
           - KowSU
           - ReSukiSU
+          - SukiSUUltra
 
       custom_name:
         description: "kernel"
@@ -267,6 +268,9 @@ jobs:
 
             "ReSukiSU")
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+              ;;
+            "SukiSUUltra")
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
               ;;
           esac
 
