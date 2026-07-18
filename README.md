@@ -1,5 +1,5 @@
 ***Read the README first***  
-main branch only support android16 for Xiaomi12(cupid)  
+main branch only support android16 for POCO F4 GT(ingres)  
 How to use:
 
 Fork this repo(remember to sync before using)  
