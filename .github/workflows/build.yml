@@ -384,21 +384,25 @@ jobs:
             droidspaces_checkbox="Unsupported"
           fi
 
+          gh release create "$REL_NAME" --title "$REL_NAME" --notes "# Kernel BEPADAAN for POCO F4 GT (ingres)
+           <## ⚙️ Kernel POCO F4 GT
 
-          gh release create "$REL_NAME" --title "$REL_NAME" --notes "# Unofficial kernel for POCO F4 GT (ingres)
-          | feature           | value                                       |
-          | ----------------- | -------------------------------------------- |
-          | Kernel source     | ${{ inputs.kernel_source }}                  |
-          | Kernel branch     | ${{ inputs.kernel_branch }}                  |
-          | Modules branch    | ${{ inputs.modules_branch }}                 |
-          | Devicetree branch | ${{ inputs.devicetree_branch }}              |
-          | Kernel name       | ${KERNEL_NAME}                               |
-          | Build time        | ${BUILD_TIME}                                |
-          | KSU type          | ${{ inputs.ksu_type }}                       |
-          | SUSFS             | ${susfs_checkbox}                            |
-          | BBG patch         | ${bbg_checkbox}                              |
-          | Re-Kernel         | ${rekernel_checkbox}                         |
-          | DroidSpaces       | ${droidspaces_checkbox}                      |
+           | | |
+           |:---|:---|
+           | 📱 Device | POCO F4 GT (ingres) • Redmi K50G (ingres) |
+           | 🟠 ROM Support | Official AOSP Only |
+           | 🖥️ Kernel Name | ${KERNEL_NAME}
+           | 🧬 Kernel Base | android12-5.10 |
+           | 🛠️ Build Scope | ZIP, IMG |
+           | 📦 Source | ${{ inputs.kernel_source }} |
+           | ⚔️ Kernel branch | ${{ inputs.kernel_branch }}
+           | 💻 KSU Manager type | ${{ inputs.ksu_type }} 
+           | 🔧 SuSFS Version | ${susfs_checkbox} 
+           | ⚙️ BBG Patch | ${bbg_checkbox} 
+           | ⚙️ Re-Kernel | ${rekernel_checkbox}
+           | 🔨 Compiler | LLVM +pgo, +bolt, +lto, +mlgo, based on r563880c) clang version 21.0.0 |
+
+           ---
           " "${ZIP_FILE}" Image
 
       - name: Send Telegram Notification
