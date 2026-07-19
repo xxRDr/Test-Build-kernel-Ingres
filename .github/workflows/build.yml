@@ -20,13 +20,13 @@ on:
         description: "Kernel source repo URL (msm-kernel). Paste any git URL here to override the default."
         required: true
         type: string
-        default: "https://github.com/yudharn/android_kernel_xiaomi_marble"
+        default: "https://github.com/xxRDr/android_kernel_xiaomi_sm8450"
 
       kernel_branch:
         description: "Branch on kernel_source above (independent from modules/devicetree branches below)"
         required: true
         type: string
-        default: "bouquet"
+        default: "lineage-23.2"
 
       modules_branch:
         description: "Branch for the LineageOS modules repo (unaffected by kernel_source/kernel_branch above - currently defaults to lineage-23.2)"
