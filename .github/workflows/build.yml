@@ -96,7 +96,7 @@ jobs:
         SOC: sm8450
         CCACHE_KEY: ccache-ecsv3-ingres-sm8450
         # Public link of your Telegram group (shown as "JOIN" button in the push).
-        TG_GROUP_URL: "https://t.me/huangdihdskernelbuilds"
+        TG_GROUP_URL: ""
     runs-on: ubuntu-latest
     permissions:
       contents: write
