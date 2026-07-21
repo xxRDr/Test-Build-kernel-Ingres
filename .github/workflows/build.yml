@@ -270,7 +270,7 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
               ;;
 
-              "SukiSUUltra")
+            "SukiSUUltra")
               curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
               ;;
           esac
@@ -360,7 +360,7 @@ jobs:
       - name: Create GitHub Release
         run: |
           BUILD_TIME=$(date -u +"%Y%m%d_%H%M")
-          REL_NAME="${SOC}_ingres-${{ inputs.kernel_branch }}-${KERNEL_NAME}-${BUILD_TIME}"
+          REL_NAME="${KERNEL_NAME}-${BUILD_TIME}"
           echo "REL_NAME=${REL_NAME}" >> $GITHUB_ENV
           cd ${GITHUB_WORKSPACE}
           ZIP_FILE=$(ls *.zip)
