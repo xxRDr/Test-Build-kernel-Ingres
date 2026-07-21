@@ -183,13 +183,10 @@ jobs:
 
       - name: Setup Android NDK (for Re-Kernel eBPF)
         if: ${{ inputs.rekernel_ebpf }}
-        run: |
-          NDK_VERSION="r27d"
-          NDK_ZIP="android-ndk-${NDK_VERSION}-linux.zip"
-          curl -L --fail --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 30 \
-            -o "${NDK_ZIP}" "https://dl.google.com/android/repository/${NDK_ZIP}"
-          unzip -q "${NDK_ZIP}" -d "${HOME}"
-          echo "NDK_PATH=${HOME}/android-ndk-${NDK_VERSION}" >> $GITHUB_ENV
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
 
       # ---- ccache-ECS (cctv18 style layered ccache) ----
       - name: Configure ccache dir and key
@@ -364,16 +361,25 @@ jobs:
       - name: Build Re-Kernel eBPF (rekerneld)
         if: ${{ inputs.rekernel_ebpf }}
         run: |
-          # ASUMSI (belum dikonfirmasi): folder "rekernel-ebpf/" berisi Makefile-mu,
-          # rekernel.bpf.c, *.bpf.h, rekernel.h, rekerneld.c, rk_format.h, PLUS
-          # folder vendored include/ (header libbpf + vmlinux.h hasil dump device
-          # kamu) dan lib/aarch64/ (libbpf.a, libelf.a, libzstd.a prebuilt), semuanya
-          # sudah ada di root repo ini. Ganti path/clone di bawah kalau beda.
-          make -C rekernel-ebpf ARCH=aarch64 NDK_PATH="${NDK_PATH}"
+          # eBPF-Source ada langsung di repo Sakion-Team/Re-Kernel (commit e701cc6),
+          # jadi cukup pakai clone yang sama dengan integrasi rekernel biasa.
+          if [[ ! -d "${SOC}/rekernel-src" ]]; then
+            git clone --depth=1 https://github.com/Sakion-Team/Re-Kernel.git "${SOC}/rekernel-src"
+          fi
+          cd "${SOC}/rekernel-src/eBPF-Source"
 
-          mkdir -p out-ebpf
-          cp rekernel-ebpf/out/rekernel.bpf.o   out-ebpf/
-          cp rekernel-ebpf/out/rekerneld_aarch64 out-ebpf/
+          # Sanity check bawaan proyeknya: vmlinux.h yang di-vendor harus dari
+          # device arm64, bukan host x86 (lihat README eBPF-Source).
+          if ! grep -q 'struct user_pt_regs {' include/vmlinux.h; then
+            echo "::error::include/vmlinux.h bukan dari device arm64 -- ganti dulu sesuai README eBPF-Source"
+            exit 1
+          fi
+
+          make ARCH=aarch64 API=35 NDK_PATH="${{ steps.ndk.outputs.ndk-path }}"
+
+          mkdir -p "${GITHUB_WORKSPACE}/out-ebpf"
+          cp out/rekernel.bpf.o    "${GITHUB_WORKSPACE}/out-ebpf/"
+          cp out/rekerneld_aarch64 "${GITHUB_WORKSPACE}/out-ebpf/"
 
       - name: Make AnyKernel3
         run: |
