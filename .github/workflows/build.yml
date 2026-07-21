@@ -20,7 +20,7 @@ on:
         description: "Kernel source repo URL (msm-kernel). Paste any git URL here to override the default."
         required: true
         type: string
-        default: "https://github.com/xxRDr/android_kernel_xiaomi_sm8450"
+        default: "https://github.com/kingD2N/android_kernel_xiaomi_sm8450"
 
       kernel_branch:
         description: "Branch on kernel_source above (independent from modules/devicetree branches below)"
@@ -395,7 +395,7 @@ jobs:
       - name: Create GitHub Release
         run: |
           BUILD_TIME=$(date -u +"%Y%m%d_%H%M")
-          REL_NAME="${SOC}_ingres-${{ inputs.kernel_branch }}-${KERNEL_NAME}-${BUILD_TIME}"
+          REL_NAME="${KERNEL_NAME}-${BUILD_TIME}"
           echo "REL_NAME=${REL_NAME}" >> $GITHUB_ENV
           cd ${GITHUB_WORKSPACE}
           ZIP_FILE=$(ls *.zip)
